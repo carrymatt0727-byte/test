@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台南市政府消防局 - 救災救護即時通報網</title>
+    <style>
+        body { font-family: 'Microsoft JhengHei', sans-serif; background-color: #f7f9fa; margin: 0; padding: 0; }
+        
+        /* 台南消防局官方感配色：橘紅與深灰 */
+        header { background-color: #d32f2f; color: white; padding: 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .header-backend { background-color: #2c3e50; position: relative; }
+        
+        .container { max-width: 1200px; margin: 25px auto; background: white; padding: 25px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: none; }
+        .container.active { display: block; }
+
+        /* 勤務看板表格 */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 15px; background: white; }
+        th, td { border: 1px solid #e0e0e0; padding: 12px 15px; text-align: left; }
+        th { background-color: #34495e; color: white; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        
+        /* 災害級別與進度標籤 */
+        .tag { padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; display: inline-block;}
+        .level-1 { background-color: #ff9800; } 
+        .level-2 { background-color: #e65100; } 
+        .level-3 { background-color: #c62828; } 
+        .tag-closed { background-color: #9e9e9e; } 
+        
+        .status-dispatch { color: #d32f2f; font-weight: bold; }
+        .status-rescue { color: #f57c00; font-weight: bold; }
+        .status-resolved { color: #2e7d32; font-weight: bold; }
+
+        /* 官方樣式頁尾 */
+        footer { background-color: #222222; color: #b2bec3; padding: 25px 20px; text-align: center; font-size: 13px; line-height: 2; margin-top: 80px; border-top: 4px solid #d32f2f; }
+        .footer-links { margin-top: 10px; color: #636e72; }
+        
+        /* 隱藏的指揮系統入口 */
+        .secret-entrance { color: #636e72; text-decoration: none; cursor: pointer; transition: 0.2s; }
+        .secret-entrance:hover { color: #ffffff; text-decoration: underline; }
+
+        /* 後台表單 */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; color: #2c3e50; }
+        input[type="text"], input[type="password"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: 'Microsoft JhengHei'; font-size: 14px; }
+        input[type="text"]:focus, select:focus { border-color: #d32f2f; outline: none; }
+        
+        .btn-submit { background-color: #d32f2f; color: white; border: none; padding: 12px 20px; font-size: 16px; cursor: pointer; border-radius: 4px; width: 100%; font-weight: bold; margin-top: 10px; transition: 0.2s; }
+        .btn-submit:hover { background-color: #b71c1c; }
+        
+        .btn-update { background-color: #1976d2; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 3px; }
+        .btn-close { background-color: #2e7d32; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 3px; }
+        .btn-delete { background-color: #c62828; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 3px; }
+        
+        /* 後台導覽鈕 */
+        .header-btn-group { position: absolute; right: 20px; top: 18px; }
+        .btn-header { background-color: #4f5d73; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        .btn-header:hover { background-color: #34495e; }
+        .btn-logout-style { background-color: #c62828; }
+        .btn-logout-style:hover { background-color: #b71c1c; }
+
+        .section-title { border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-top: 40px; color: #2c3e50; }
+
+        /* 安全驗證密碼箱 */
+        .login-box { max-width: 400px; margin: 80px auto; text-align: center; background: white; padding: 30px; border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .login-box h3 { color: #2c3e50; margin-bottom: 20px; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; }
+        .error-msg { color: #c62828; font-size: 14px; margin-top: 10px; display: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="page-frontend" class="container active" style="max-width: 100%; margin: 0; padding: 0; border-radius: 0; box-shadow: none;">
+    <header>
+        <h2 style="margin: 0; letter-spacing: 3px;">台南市政府消防局 救災救護指揮中心即時通報網</h2>
+    </header>
+    
+    <div style="max-width: 1200px; margin: 30px auto; padding: 0 20px;">
+        <h3 style="color: #2c3e50; border-left: 5px solid #d32f2f; padding-left: 12px; margin-bottom: 20px;">大台南轄區即時災情動態看板</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 15%;">派遣編號</th>
+                    <th style="width: 10%;">報案時間</th>
+                    <th style="width: 10%;">級別</th>
+                    <th style="width: 12%;">災害類別</th>
+                    <th>事故地點</th>
+                    <th style="width: 25%;">初期派遣實力</th>
+                    <th style="width: 13%;">處置狀態</th>
+                </tr>
+            </thead>
+            <tbody id="frontend-list"></tbody>
+        </table>
+    </div>
+
+    <footer>
+        <div>台南市政府消防局 版權所有 © 2026 救災救護指揮中心</div>
+        <div>地址：708003 台南市安平區永華路二段890號 | 檢舉與報案專線：119 | 機關總機：(06) 297-5119</div>
+        <div class="footer-links">
+            <span>隱私權及安全政策宣告</span> | <span>政府網站資料開放宣告</span> | 
+            <span class="secret-entrance" onclick="navigateTo('login')">系統維護：資訊管理科</span>
+        </div>
+    </footer>
+</div>
+
+<div id="page-login" class="container">
+    <div class="login-box">
+        <h3>勤務管制系統安全驗證</h3>
+        <form id="login-form">
+            <div class="form-group" style="text-align: left;">
+                <label>公務人員帳號</label>
+                <input type="text" id="username" placeholder="請輸入公務編號" required>
+            </div>
+            <div class="form-group" style="text-align: left;">
+                <label>通訊管制密碼</label>
+                <input type="password" id="password" placeholder="請輸入管制密碼" required>
+            </div>
+            <button type="submit" class="btn-submit" style="background-color: #2c3e50;">執行授權認證</button>
+            <button type="button" class="btn-submit" style="background-color: #7f8c8d; margin-top: 5px;" onclick="navigateTo('frontend')">返回公開看板</button>
+            <div id="login-error" class="error-msg">安全阻斷：驗證失敗，帳號或密碼錯誤。</div>
+        </form>
+    </div>
+</div>
+
+<div id="page-backend" class="container">
+    <header class="header-backend">
+        <h2 style="margin: 0; letter-spacing: 1px;">救災救護指揮中心 - 戰情與派遣管制系統</h2>
+        <div class="header-btn-group">
+            <button class="btn-header" onclick="navigateTo('frontend')">切換公眾前台</button>
+            <button class="btn-header btn-logout-style" onclick="logout()">安全登出鎖定</button>
+        </div>
+    </header>
+    
+    <h3 class="section-title" style="margin-top: 10px;">受理新進案源通報</h3>
+    <form id="incident-form">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>災害類別</label>
+                <select id="type">
+                    <option value="火警通報">火警通報 (Fire)</option>
+                    <option value="緊急救護">緊急救護 (Medical)</option>
+                    <option value="為民服務">為民服務 (Public Service)</option>
+                    <option value="特種災害">特種災害 (Special Hazard)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>災害級別</label>
+                <select id="level">
+                    <option value="一級">一級 (一般災害/常規派遣)</option>
+                    <option value="二級">二級 (中度災害/跨區增援)</option>
+                    <option value="三級">三級 (重大災害/啟動擴大派遣)</option>
+                </select>
+            </div>
+            <div class="form-group full-width">
+                <label>事故詳細地點 (請詳述行政區、路段、目標建築)</label>
+                <input type="text" id="location" placeholder="例如：安平區永華路二段與中華西路交叉口" required>
+            </div>
+            <div class="form-group">
+                <label>出動車組/派遣主力</label>
+                <input type="text" id="units" placeholder="例如：安平分隊（水箱11、救護51）、特隊（化學車）" required>
+            </div>
+            <div class="form-group">
+                <label>案件初始狀態</label>
+                <select id="status">
+                    <option value="梯隊派遣中" selected>梯隊派遣中</option>
+                    <option value="抵達現場搶救中">抵達現場搶救中</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn-submit">確認發布調度令</button>
+    </form>
+
+    <h3 class="section-title">線上執勤車組即時管制 (未結案)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>派遣編號</th>
+                <th>事故地點</th>
+                <th>當前管制狀態</th>
+                <th>動態命令變更</th>
+                <th>指揮官操作</th>
+            </tr>
+        </thead>
+        <tbody id="backend-active-list"></tbody>
+    </table>
+
+    <h3 class="section-title">歷史勤務存檔紀錄 (已結案)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>派遣編號</th>
+                <th>類別</th>
+                <th>事故地點</th>
+                <th>最終處置狀態</th>
+                <th>戰情操作</th>
+            </tr>
+        </thead>
+        <tbody id="backend-history-list"></tbody>
+    </table>
+</div>
+
+<script>
+    // 資料暫存區
+    let incidents = JSON.parse(localStorage.getItem('tainanFireIncidents')) || [];
+    
+    // 後台權限設定
+    const ADMIN_USER = 'admin';
+    const ADMIN_PASS = 'tainan119';
+
+    // 路由核心邏輯
+    function navigateTo(targetPage) {
+        document.getElementById('page-frontend').style.display = 'none';
+        document.getElementById('page-login').style.display = 'none';
+        document.getElementById('page-backend').style.display = 'none';
+
+        if (targetPage === 'backend' || targetPage === 'login') {
+            if (sessionStorage.getItem('tainanLoggedIn') === 'true') {
+                document.getElementById('page-backend').style.display = 'block';
+            } else {
+                document.getElementById('page-login').style.display = 'block';
+            }
+        } else {
+            document.getElementById('page-frontend').style.display = 'block';
+        }
+        renderTables();
+    }
+
+    // 登入程序
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+        const errorMsg = document.getElementById('login-error');
+
+        if (user === ADMIN_USER && pass === ADMIN_PASS) {
+            sessionStorage.setItem('tainanLoggedIn', 'true');
+            errorMsg.style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            navigateTo('backend');
+        } else {
+            errorMsg.style.display = 'block';
+        }
+    });
+
+    // 安全登出
+    function logout() {
+        sessionStorage.removeItem('tainanLoggedIn');
+        alert('安全警戒：勤務管制系統已安全登出並鎖定。');
+        navigateTo('frontend');
+    }
+
+    /* 指揮數據處理 */
+    const getCurrentTime = () => new Date().toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit', hour12: false});
+    const generateID = () => {
+        const d = new Date();
+        const dateStr = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+        return `TNF-${dateStr}-${Math.floor(Math.random() * 900) + 100}`;
+    }
+
+    // 發布新通報
+    document.getElementById('incident-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const newIncident = {
+            id: generateID(), time: getCurrentTime(),
+            type: document.getElementById('type').value, level: document.getElementById('level').value,
+            location: document.getElementById('location').value, units: document.getElementById('units').value,
+            status: document.getElementById('status').value, isClosed: false
+        };
+        incidents.unshift(newIncident); 
+        saveData(); renderTables();
+        document.getElementById('location').value = ''; document.getElementById('units').value = '';
+        alert('戰情提示：調度令發布成功，已同步至前台看板！'); navigateTo('frontend');
+    });
+
+    // 狀態變更
+    function updateStatus(id) {
+        const newStatus = document.getElementById(`status-update-${id}`).value;
+        const index = incidents.findIndex(inc => inc.id === id);
+        if(index !== -1) { incidents[index].status = newStatus; saveData(); renderTables(); alert(`派遣案 ${id} 狀態變更為：${newStatus}`); }
+    }
+
+    // 結案程序
+    function closeIncident(id) {
+        if(confirm('確認執行結案歸檔？該案件將從民眾即時看板中撤除。')) {
+            const index = incidents.findIndex(inc => inc.id === id);
+            if(index !== -1) { incidents[index].status = '任務結束/已結案'; incidents[index].isClosed = true; saveData(); renderTables(); }
+        }
+    }
+
+    // 資料抹除
+    function deleteIncident(id) {
+        if(confirm('【極機密操作】確定永久作廢此條勤務紀錄嗎？此動作將無法復原。')) {
+            incidents = incidents.filter(inc => inc.id !== id); saveData(); renderTables();
+        }
+    }
+
+    function saveData() { localStorage.setItem('tainanFireIncidents', JSON.stringify(incidents)); }
+
+    // 渲染報表表格
+    function renderTables() {
+        const frontendList = document.getElementById('frontend-list');
+        const backendActiveList = document.getElementById('backend-active-list');
+        const backendHistoryList = document.getElementById('backend-history-list');
+        
+        if(!frontendList || !backendActiveList || !backendHistoryList) return;
+
+        frontendList.innerHTML = ''; backendActiveList.innerHTML = ''; backendHistoryList.innerHTML = '';
+        let activeCount = 0; let historyCount = 0;
+
+        incidents.forEach(inc => {
+            let statusClass = inc.status.includes('搶救') ? 'status-rescue' : inc.status.includes('控制') || inc.status.includes('結束') ? 'status-resolved' : 'status-dispatch';
+            let levelClass = inc.level === '一級' ? 'level-1' : inc.level === '二級' ? 'level-2' : 'level-3';
+
+            if (!inc.isClosed) {
+                frontendList.innerHTML += `<tr><td><b>${inc.id}</b></td><td>${inc.time}</td><td><span class="tag ${levelClass}">${inc.level}</span></td><td>${inc.type}</td><td>${inc.location}</td><td>${inc.units}</td><td class="${statusClass}">${inc.status}</td></tr>`;
+                backendActiveList.innerHTML += `<tr><td>${inc.id}</td><td>${inc.location}</td><td class="${statusClass}">${inc.status}</td><td><select id="status-update-${inc.id}"><option value="梯隊派遣中" ${inc.status==='梯隊派遣中'?'selected':''}>梯隊派遣中</option><option value="抵達現場搶救中" ${inc.status==='抵達現場搶救中'?'selected':''}>抵達現場搶救中</option><option value="火勢控制/處理中" ${inc.status==='火勢控制/處理中'?'selected':''}>火勢控制/處理中</option></select></td><td><button class="btn-update" onclick="updateStatus('${inc.id}')">變更</button> <button class="btn-close" onclick="closeIncident('${inc.id}')">結案</button></td></tr>`;
+                activeCount++;
+            } else {
+                backendHistoryList.innerHTML += `<tr><td>${inc.id}</td><td><span class="tag tag-closed">${inc.type}</span></td><td>${inc.location}</td><td class="status-resolved">${inc.status}</td><td><button class="btn-delete" onclick="deleteIncident('${inc.id}')">作廢</button></td></tr>`;
+                historyCount++;
+            }
+        });
+
+        if(activeCount === 0) { frontendList.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#7f8c8d; padding: 35px;">目前大台南市轄區內無處理中之災害案件</td></tr>'; backendActiveList.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#7f8c8d; padding: 20px;">目前無在線執勤車組管制</td></tr>'; }
+        if(historyCount === 0) { backendHistoryList.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#7f8c8d; padding: 20px;">目前無歷史結案歸檔紀錄</td></tr>'; }
+    }
+
+    // 啟動加載
+    navigateTo('frontend');
+</script>
+
+</body>
+</html>
